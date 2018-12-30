@@ -12,8 +12,7 @@ pub fn shld(dest: u32, src: u32, count: u8) -> u32 {
 pub fn load_new_data<R: Read>(reader: &mut R, pak_k: &mut u32, pak_m: &mut u32) -> Result<()> {
     let new_data = {
         let mut buf = [0u8; 2];
-        reader.read_exact(&mut buf).unwrap();
-        // This is weird, I don't know if the data is read correctly
+        reader.read_exact(&mut buf)?;
         u32::from_be(u32::from(unsafe { transmute::<[u8; 2], u16>(buf) }))
     };
     *pak_k = shld(*pak_k, new_data, 16);
@@ -24,9 +23,9 @@ pub fn load_new_data<R: Read>(reader: &mut R, pak_k: &mut u32, pak_m: &mut u32) 
 pub fn load_new_data_drop<R: Read>(reader: &mut R, pak_k: &mut u32, pak_m: &mut u32) -> Result<()> {
     *pak_k = {
         let mut buf = [0u8; 2];
-        reader.read_exact(&mut buf).unwrap();
-        // This is weird, I don't know if the data is read correctly
-        u32::from(u16::from_be(unsafe { transmute::<[u8; 2], u16>(buf) }))
+        reader.read_exact(&mut buf)?;
+        let value = u32::from(unsafe { transmute::<[u8; 2], u16>(buf) });
+        u32::from_be(value) >> 16
     };
     *pak_m = 15;
     Ok(())

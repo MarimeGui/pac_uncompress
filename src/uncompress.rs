@@ -76,13 +76,11 @@ pub fn uncompress<R: Read + Seek, W: Write>(reader: &mut R, writer: &mut W) -> R
         let mut pak_k = 0;
         let mut pak_m = 0;
         let dict_result = make_dict(&mut dict, &mut 256, &mut pak_m, &mut pak_k, reader);
-        //println!("Dict {:?}", dict.to_vec());
 
         // Check if data is always the same value
         if dict_result > 255 {
             // Make the hints
             make_hint_table(&dict, &mut hints);
-            //println!("Hints {:?}", hints.to_vec());
 
             loop {
                 // decode_rep
@@ -94,9 +92,9 @@ pub fn uncompress<R: Read + Seek, W: Write>(reader: &mut R, writer: &mut W) -> R
                 pak_m -= HINT_BITS as u32;
                 temp >>= pak_m & 255;
                 temp &= (1<<HINT_BITS)-1;
-                temp = hints[temp as usize][0] as u32;
+                let mut read_value = hints[temp as usize][0] as u32;
                 pak_m += hints[temp as usize][1] as u32;
-                if temp > 255 {
+                if read_value > 255 {
                     loop {
                         // search_ch_rep
                         pak_m -= 1;
@@ -105,18 +103,16 @@ pub fn uncompress<R: Read + Seek, W: Write>(reader: &mut R, writer: &mut W) -> R
                             load_new_data_drop(reader, &mut pak_k, &mut pak_m)?;
                         }
                         // test_hbit
-                        let mut temp2 = pak_k;
-                        temp2 >>= pak_m & 255;
-                        temp2 &= 1; // Keep only LSB
-                        let index = (temp*4-1024 + temp2*2)/2;
-                        temp = u32::from(dict[index as usize]);
-                        if temp <= 255 {
+                        let bit_test = (pak_k >> (pak_m & 255)) & 1;
+                        let index = 2*read_value - 512 + bit_test;
+                        read_value = u32::from(dict[index as usize]);
+                        if read_value <= 255 {
                             break;
                         }
                     }
                 }
                 // put_ch
-                writer.write_to_u8(temp as u8)?;
+                writer.write_to_u8(read_value as u8)?;
                 written_bytes += 1;
                 if written_bytes >= info.unpack_size {
                     break;
