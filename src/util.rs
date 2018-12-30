@@ -20,3 +20,14 @@ pub fn load_new_data<R: Read>(reader: &mut R, pak_k: &mut u32, pak_m: &mut u32) 
     *pak_m += 16;
     Ok(())
 }
+
+pub fn load_new_data_drop<R: Read>(reader: &mut R, pak_k: &mut u32, pak_m: &mut u32) -> Result<()> {
+    *pak_k = {
+        let mut buf = [0u8; 2];
+        reader.read_exact(&mut buf).unwrap();
+        // This is weird, I don't know if the data is read correctly
+        u32::from(u16::from_be(unsafe { transmute::<[u8; 2], u16>(buf) }))
+    };
+    *pak_m = 15;
+    Ok(())
+}

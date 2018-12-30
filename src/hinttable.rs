@@ -16,7 +16,7 @@ pub fn make_hint_table(dict: &[u16; DICT_LEN * 2], hints: &mut [[u16; 2]; 1 << H
             }
         }
 
-        let stop = ((1 << bit_index as usize) - 1) | hint_index;
+        let stop = ((1 << (bit_index as usize)) - 1) | hint_index;
 
         loop {
             hints[hint_index] = [read_value, bit_index];

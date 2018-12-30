@@ -15,14 +15,15 @@ pub fn make_dict<R: Read>(
 
     *pak_m -= 1;
     // Test for bit at pak_m (0 = lsb)
-    if (*pak_k & (1 << *pak_m)) != (1 << *pak_m) {
+    if (*pak_k & (1 << *pak_m)) == 0 {
         *pak_m -= 8;
         (*pak_k >> (*pak_m & 255)) & 255
     } else {
+        let pak_tlen_old = *pak_tlen;
         *pak_tlen += 1;
-        let index = 2 * *pak_tlen as usize - 514;
+        let index = 2 * pak_tlen_old as usize - 512;
         dict[index] = make_dict(dict, pak_tlen, pak_m, pak_k, reader) as u16;
         dict[index + 1] = make_dict(dict, pak_tlen, pak_m, pak_k, reader) as u16;
-        *pak_tlen - 1
+        pak_tlen_old
     }
 }

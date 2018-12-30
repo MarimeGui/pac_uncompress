@@ -1,7 +1,7 @@
 use crate::{
-    dict::make_dict, hinttable::make_hint_table, util::load_new_data, DICT_LEN, HINT_BITS,
+    dict::make_dict, hinttable::make_hint_table, util::{load_new_data, load_new_data_drop}, DICT_LEN, HINT_BITS,
 };
-use ez_io::{MagicNumberCheck, ReadE};
+use ez_io::{MagicNumberCheck, ReadE, WriteE};
 use std::io::{Read, Result, Seek, SeekFrom, Write};
 
 struct PacData {
@@ -64,6 +64,9 @@ pub fn uncompress<R: Read + Seek, W: Write>(reader: &mut R, writer: &mut W) -> R
 
     // Process the data
     for info in pac_info {
+        // Count how many bytes we wrote
+        let mut written_bytes = 0u32;
+
         // Go to location specified by PacInfo
         reader.seek(SeekFrom::Start(
             compressed_binary_offset + u64::from(info.offset),
@@ -72,9 +75,8 @@ pub fn uncompress<R: Read + Seek, W: Write>(reader: &mut R, writer: &mut W) -> R
         // Make the dict and values
         let mut pak_k = 0;
         let mut pak_m = 0;
-        let mut pak_tlen = 256;
-        let dict_result = make_dict(&mut dict, &mut pak_tlen, &mut pak_m, &mut pak_k, reader);
-        println!("Dict {:?}", dict.to_vec());
+        let dict_result = make_dict(&mut dict, &mut 256, &mut pak_m, &mut pak_k, reader);
+        //println!("Dict {:?}", dict.to_vec());
 
         // Check if data is always the same value
         if dict_result > 255 {
@@ -82,10 +84,44 @@ pub fn uncompress<R: Read + Seek, W: Write>(reader: &mut R, writer: &mut W) -> R
             make_hint_table(&dict, &mut hints);
             //println!("Hints {:?}", hints.to_vec());
 
-            if pak_m < HINT_BITS as u32 {
-                load_new_data(reader, &mut pak_k, &mut pak_m)?;
+            loop {
+                // decode_rep
+                if pak_m < HINT_BITS as u32 {
+                    load_new_data(reader, &mut pak_k, &mut pak_m)?;
+                }
+                // test_hint_bits
+                let mut temp = pak_k;
+                pak_m -= HINT_BITS as u32;
+                temp >>= pak_m & 255;
+                temp &= (1<<HINT_BITS)-1;
+                temp = hints[temp as usize][0] as u32;
+                pak_m += hints[temp as usize][1] as u32;
+                if temp > 255 {
+                    loop {
+                        // search_ch_rep
+                        pak_m -= 1;
+                        // If pak_m MSB is set
+                        if pak_m & (1 << 31) != 0 {
+                            load_new_data_drop(reader, &mut pak_k, &mut pak_m)?;
+                        }
+                        // test_hbit
+                        let mut temp2 = pak_k;
+                        temp2 >>= pak_m & 255;
+                        temp2 &= 1; // Keep only LSB
+                        let index = (temp*4-1024 + temp2*2)/2;
+                        temp = u32::from(dict[index as usize]);
+                        if temp <= 255 {
+                            break;
+                        }
+                    }
+                }
+                // put_ch
+                writer.write_to_u8(temp as u8)?;
+                written_bytes += 1;
+                if written_bytes >= info.unpack_size {
+                    break;
+                }
             }
-            // test_hint_bits
         } else {
             // This part of the data is the same byte repeated, write the output
             writer.write_all(&vec![dict_result as u8; info.unpack_size as usize])?;
