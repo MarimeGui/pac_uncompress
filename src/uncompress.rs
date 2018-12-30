@@ -92,14 +92,14 @@ pub fn uncompress<R: Read + Seek, W: Write>(reader: &mut R, writer: &mut W) -> R
                 pak_m -= HINT_BITS as u32;
                 temp >>= pak_m & 255;
                 temp &= (1<<HINT_BITS)-1;
-                let mut read_value = hints[temp as usize][0] as u32;
-                pak_m += hints[temp as usize][1] as u32;
+                let mut read_value = u32::from(hints[temp as usize][0]);
+                pak_m += u32::from(hints[temp as usize][1]);
                 if read_value > 255 {
                     loop {
                         // search_ch_rep
-                        pak_m -= 1;
-                        // If pak_m MSB is set
-                        if pak_m & (1 << 31) != 0 {
+                        if pak_m != 0 {
+                            pak_m -= 1;
+                        } else {
                             load_new_data_drop(reader, &mut pak_k, &mut pak_m)?;
                         }
                         // test_hbit
